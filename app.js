@@ -13,30 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let processedImageBlob = null;
     let originalFileName = "detoure_pro";
-    let net = null;
-
-    // Charger l'IA de manière ultra-stable et sécurisée
-    async function loadModel() {
-        if (net) return net;
-        try {
-            // Forcer le backend CPU pour éviter les bugs de carte graphique
-            await tf.setBackend('cpu'); 
-            
-            net = await bodyPix.load({
-                architecture: 'MobileNetV1',
-                outputStride: 16,
-                multiplier: 0.50, // Modèle ultra-léger et rapide
-                quantBytes: 1
-            });
-            console.log("IA TensorFlow prête pour la production !");
-            return net;
-        } catch (err) {
-            console.error("Erreur d'initialisation de l'IA :", err);
-        }
-    }
-
-    // Pré-chargement automatique au démarrage
-    loadModel();
 
     // Événements d'importation d'image
     dropZone.addEventListener('click', () => fileInput.click());
@@ -65,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Traitement optimisé
+    // Traitement de l'image en local sans IA et sans API
     async function handleImage(file) {
         if (!file.type.startsWith('image/')) {
             alert('Veuillez sélectionner un fichier image valide.');
@@ -75,115 +51,47 @@ document.addEventListener('DOMContentLoaded', () => {
         originalFileName = file.name.split('.').slice(0, -1).join('.') + '_detoure.png';
 
         const reader = new FileReader();
-        reader.onload = async (e) => {
-            // Sécurité anti-CORS : utilisation d'une URL de données locale et sécurisée
+        reader.onload = (e) => {
             originalPreview.src = e.target.result;
             
-            originalPreview.onload = async () => {
+            originalPreview.onload = () => {
+                // Afficher le chargement brièvement
                 dropZone.classList.add('hidden');
                 loadingContainer.classList.remove('hidden');
 
                 try {
-                    const model = await loadModel();
-                    if (!model) throw new Error("Le modèle d'IA n'a pas pu être initialisé.");
-
-                    // Étape 1 : Créer une miniature de calcul (300px max) pour économiser la mémoire
-                    const tinyCanvas = document.createElement('canvas');
-                    const tinyCtx = tinyCanvas.getContext('2d');
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
                     
-                    const tinySize = 300;
-                    let tinyW = originalPreview.naturalWidth;
-                    let tinyH = originalPreview.naturalHeight;
-                    if (tinyW > tinyH) {
-                        tinyH = Math.round((tinyH * tinySize) / tinyW);
-                        tinyW = tinySize;
-                    } else {
-                        tinyW = Math.round((tinyW * tinySize) / tinyH);
-                        tinyH = tinySize;
-                    }
-                    tinyCanvas.width = tinyW;
-                    tinyCanvas.height = tinyH;
-                    
-                    tinyCtx.drawImage(originalPreview, 0, 0, tinyW, tinyH);
+                    canvas.width = originalPreview.naturalWidth;
+                    canvas.height = originalPreview.naturalHeight;
+                    ctx.drawImage(originalPreview, 0, 0);
 
-                    // Étape 2 : L'IA segmente la miniature instantanément
-                    const segmentation = await model.segmentPerson(tinyCanvas, {
-                        internalResolution: 'low',
-                        segmentationThreshold: 0.6
-                    });
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
 
-                    // Étape 3 : Appliquer le masque sur l'image d'origine en haute définition
-                    const finalCanvas = document.createElement('canvas');
-                    const finalCtx = finalCanvas.getContext('2d');
-                    const origW = originalPreview.naturalWidth;
-                    const origH = originalPreview.naturalHeight;
-                    
-                    finalCanvas.width = origW;
-                    finalCanvas.height = origH;
+                    // 1. Détecter la couleur du fond (on prend le pixel en haut à gauche [0,0])
+                    const targetR = data[0];
+                    const targetG = data[1];
+                    const targetB = data[2];
 
-                    finalCtx.drawImage(originalPreview, 0, 0);
-                    const originalData = finalCtx.getImageData(0, 0, origW, origH);
-                    const pixels = originalData.data;
+                    // Seuil de tolérance pour la suppression de couleur (ajustable)
+                    const tolerance = 45; 
 
-                    for (let y = 0; y < origH; y++) {
-                        for (let x = 0; x < origW; x++) {
-                            const tinyX = Math.floor((x * tinyW) / origW);
-                            const tinyY = Math.floor((y * tinyH) / origH);
-                            const tinyIndex = tinyY * tinyW + tinyX;
+                    // 2. Parcourir tous les pixels et rendre transparents ceux proches de la couleur cible
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
 
-                            if (segmentation.data[tinyIndex] === 0) {
-                                const origIndex = (y * origW + x) * 4;
-                                pixels[origIndex + 3] = 0; // Transparence
-                            }
+                        // Calcul de la différence de couleur (distance euclidienne simple)
+                        const diff = Math.sqrt(
+                            Math.pow(r - targetR, 2) +
+                            Math.pow(g - targetG, 2) +
+                            Math.pow(b - targetB, 2)
+                        );
+
+                        if (diff < tolerance) {
+                            data[i + 3] = 0; // Rendre transparent (Alpha = 0)
                         }
-                    }
-
-                    finalCtx.putImageData(originalData, 0, 0);
-
-                    // Étape 4 : Conversion finale en fichier téléchargeable
-                    finalCanvas.toBlob((blob) => {
-                        processedImageBlob = blob;
-                        resultPreview.src = URL.createObjectURL(blob);
-
-                        loadingContainer.classList.add('hidden');
-                        resultContainer.classList.remove('hidden');
-                        actionContainer.classList.remove('hidden');
-                    }, 'image/png');
-
-                } catch (error) {
-                    console.error("Erreur de traitement :", error);
-                    alert("Une erreur de sécurité ou de mémoire est survenue en local. La mise en ligne va résoudre ce problème.");
-                    resetApp();
-                }
-            };
-        };
-        reader.readAsDataURL(file);
-    }
-
-    // Télécharger le résultat
-    downloadBtn.addEventListener('click', () => {
-        if (!processedImageBlob) return;
-        
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(processedImageBlob);
-        link.download = originalFileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    });
-
-    // Recommencer
-    resetBtn.addEventListener('click', resetApp);
-
-    function resetApp() {
-        processedImageBlob = null;
-        fileInput.value = '';
-        originalPreview.src = '';
-        resultPreview.src = '';
-        
-        resultContainer.classList.add('hidden');
-        actionContainer.classList.add('hidden');
-        loadingContainer.classList.add('hidden');
-        dropZone.classList.remove('hidden');
-    }
-});
+  …
