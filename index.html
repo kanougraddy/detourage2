@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détourage Pro - Supprimez l'arrière-plan gratuitement</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Chargement sécurisé et ultra-compatible des bibliothèques d'IA -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <header>
+        <div class="logo">✂️ Détourage Pro</div>
+        <p class="tagline">Outil professionnel de détourage 100% gratuit et sans internet</p>
+    </header>
+
+    <main class="container">
+        <!-- Zone d'importation -->
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-content">
+                <span class="icon">📁</span>
+                <p>Glissez-déposez votre image ici ou <strong>cliquez pour choisir</strong></p>
+                <span class="formats">Formats supportés : PNG, JPG, WEBP</span>
+                <input type="file" id="fileInput" accept="image/*" hidden>
+            </div>
+        </div>
+
+        <!-- Zone d'attente -->
+        <div class="loading-container hidden" id="loadingContainer">
+            <div class="spinner"></div>
+            <p id="loadingText">Analyse de la silhouette par l'IA locale...</p>
+            <div class="ad-placeholder-loading">
+                <p>Optimisation du traitement en cours...</p>
+            </div>
+        </div>
+
+        <!-- Zone des résultats -->
+        <div class="result-container hidden" id="resultContainer">
+            <div class="preview-box">
+                <h3>Original</h3>
+                <img id="originalPreview" src="" alt="Image originale" crossorigin="anonymous">
+            </div>
+            <div class="preview-box">
+                <h3>Détouré</h3>
+                <div class="transparent-bg">
+                    <img id="resultPreview" src="" alt="Image détourée">
+                </div>
+            </div>
+        </div>
+
+        <!-- Boutons d'action -->
+        <div class="actions hidden" id="actionContainer">
+            <button class="btn btn-download" id="downloadBtn">Télécharger en PNG transparent</button>
+            <button class="btn btn-reset" id="resetBtn">Détourer une autre image</button>
+        </div>
+    </main>
+
+    <footer class="footer-ad">
+        <div class="ad-banner">
+            <p>Espace Publicitaire (AdSense / Partenaires)</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
