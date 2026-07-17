@@ -1,164 +1,238 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const dropZone = document.getElementById('dropZone');
-    const fileInput = document.getElementById('fileInput');
-    const loadingContainer = document.getElementById('loadingContainer');
-    const resultContainer = document.getElementById('resultContainer');
-    const actionContainer = document.getElementById('actionContainer');
-    
-    const originalPreview = document.getElementById('originalPreview');
-    const resultPreview = document.getElementById('resultPreview');
-    
-    const downloadBtn = document.getElementById('downloadBtn');
-    const resetBtn = document.getElementById('resetBtn');
+:root {
+    --bg-color: #121214;
+    --card-bg: #1e1e24;
+    --primary: #0070f3;
+    --primary-hover: #0051b3;
+    --text-color: #f5f5f7;
+    --text-muted: #a0a0ba;
+    --border-color: #2a2a35;
+}
 
-    let processedImageBlob = null;
-    let originalFileName = "detoure_pro";
-    let net = null;
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
 
-    // Charger le modèle de détourage en tâche de fond dès l'ouverture du site
-    async function loadModel() {
-        try {
-            net = await bodyPix.load({
-                architecture: 'MobileNetV1',
-                outputStride: 16,
-                multiplier: 0.75,
-                quantBytes: 2
-            });
-            console.log("Moteur d'IA TensorFlow chargé !");
-        } catch (err) {
-            console.error("Erreur de chargement du modèle :", err);
-        }
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-bottom: 110px; /* Espace pour la pub du bas */
+}
+
+header {
+    text-align: center;
+    padding: 2.5rem 1rem 1rem;
+}
+
+.logo {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.tagline {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+.container {
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    flex: 1;
+}
+
+/* Zone de Drag and Drop */
+.drop-zone {
+    background-color: var(--card-bg);
+    border: 3px dashed var(--border-color);
+    border-radius: 16px;
+    padding: 4rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--primary);
+    background-color: #1e1e2f;
+}
+
+.drop-zone-content .icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.drop-zone-content p {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.drop-zone-content strong {
+    color: var(--primary);
+}
+
+.formats {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* Loader */
+.loading-container {
+    text-align: center;
+    padding: 3rem;
+    background-color: var(--card-bg);
+    border-radius: 16px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid var(--border-color);
+    border-top: 5px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Résultats Avant / Après */
+.result-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+    .result-container {
+        grid-template-columns: 1fr;
     }
-    loadModel();
+}
 
-    // Événements d'importation d'image
-    dropZone.addEventListener('click', () => fileInput.click());
+.preview-box {
+    background-color: var(--card-bg);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
 
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            handleImage(e.target.files[0]);
-        }
-    });
+.preview-box h3 {
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: var(--text-muted);
+}
 
-    // Drag & Drop
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-over');
-    });
+.preview-box img {
+    max-width: 100%;
+    max-height: 350px;
+    border-radius: 8px;
+    object-fit: contain;
+}
 
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('drag-over');
-    });
+/* Fond en damier pour la transparence */
+.transparent-bg {
+    background-color: #333;
+    background-image: linear-gradient(45deg, #444 25%, transparent 25%), 
+                      linear-gradient(-45deg, #444 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, #444 75%), 
+                      linear-gradient(-45deg, transparent 75%, #444 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    border-radius: 8px;
+    display: inline-block;
+    max-width: 100%;
+}
 
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        if (e.dataTransfer.files.length > 0) {
-            handleImage(e.dataTransfer.files[0]);
-        }
-    });
+/* Boutons */
+.actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    margin-bottom: 3rem;
+}
 
-    // Traitement de l'image
-    async function handleImage(file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Veuillez sélectionner un fichier image valide.');
-            return;
-        }
+.btn {
+    padding: 0.8rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
 
-        originalFileName = file.name.split('.').slice(0, -1).join('.') + '_detoure.png';
+.btn-download {
+    background-color: var(--primary);
+    color: white;
+}
 
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            originalPreview.src = e.target.result;
-            
-            originalPreview.onload = async () => {
-                // Changement d'état visuel vers "Chargement"
-                dropZone.classList.add('hidden');
-                loadingContainer.classList.remove('hidden');
-                document.getElementById('loadingText').innerText = "Détourage en cours (Calcul TensorFlow local)...";
+.btn-download:hover {
+    background-color: var(--primary-hover);
+}
 
-                try {
-                    // Si le modèle n'a pas fini de charger, on l'attend
-                    if (!net) {
-                        document.getElementById('loadingText').innerText = "Initialisation du moteur d'IA...";
-                        await loadModel();
-                    }
+.btn-reset {
+    background-color: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
 
-                    // Créer un canvas pour manipuler l'image
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = originalPreview.naturalWidth;
-                    canvas.height = originalPreview.naturalHeight;
-                    
-                    ctx.drawImage(originalPreview, 0, 0);
+.btn-reset:hover {
+    background-color: #222;
+    color: white;
+}
 
-                    // Segmentation du sujet de l'image par l'IA
-                    const segmentation = await net.segmentPerson(canvas, {
-                        internalResolution: 'high',
-                        segmentationThreshold: 0.7
-                    });
+.hidden {
+    display: none !important;
+}
 
-                    // Récupération et manipulation des pixels
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const pixelData = imageData.data;
+/* Espaces Publicitaires */
+.ad-placeholder-loading {
+    margin-top: 2rem;
+    background: #2a2a35;
+    border: 1px dashed #555;
+    padding: 1.5rem;
+    border-radius: 8px;
+    color: var(--text-muted);
+}
 
-                    // Suppression de l'arrière-plan (rendre transparent)
-                    for (let i = 0; i < pixelData.length; i += 4) {
-                        const isBackground = segmentation.data[i / 4] === 0;
-                        if (isBackground) {
-                            pixelData[i + 3] = 0; // Canal Alpha mis à 0
-                        }
-                    }
+.footer-ad {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #0b0b0c;
+    border-top: 1px solid var(--border-color);
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    z-index: 100;
+}
 
-                    ctx.putImageData(imageData, 0, 0);
-
-                    // Conversion en PNG transparent final
-                    canvas.toBlob((blob) => {
-                        processedImageBlob = blob;
-                        const resultUrl = URL.createObjectURL(blob);
-
-                        resultPreview.src = resultUrl;
-
-                        // Affichage des résultats à l'utilisateur
-                        loadingContainer.classList.add('hidden');
-                        resultContainer.classList.remove('hidden');
-                        actionContainer.classList.remove('hidden');
-                    }, 'image/png');
-
-                } catch (error) {
-                    console.error("Erreur de traitement :", error);
-                    alert("Une erreur est survenue lors du traitement.");
-                    resetApp();
-                }
-            };
-        };
-        reader.readAsDataURL(file);
-    }
-
-    // Gestion du téléchargement
-    downloadBtn.addEventListener('click', () => {
-        if (!processedImageBlob) return;
-        
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(processedImageBlob);
-        link.download = originalFileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    });
-
-    // Recommencer
-    resetBtn.addEventListener('click', resetApp);
-
-    function resetApp() {
-        processedImageBlob = null;
-        fileInput.value = '';
-        originalPreview.src = '';
-        resultPreview.src = '';
-        
-        resultContainer.classList.add('hidden');
-        actionContainer.classList.add('hidden');
-        loadingContainer.classList.add('hidden');
-        dropZone.classList.remove('hidden');
-    }
-});
+.ad-banner {
+    max-width: 728px;
+    width: 100%;
+    height: 90px;
+    background-color: #1a1a24;
+    border: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    border-radius: 4px;
+}
